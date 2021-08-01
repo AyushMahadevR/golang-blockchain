@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/gob"
 	"fmt"
+	"time"
 )
 
 type Transaction struct {
@@ -15,9 +16,12 @@ type Transaction struct {
 }
 
 type Block struct {
-	data     []*Transaction
-	prevHash []byte
-	hash     []byte
+	index       uint32
+	nonce       uint32
+	transcation []*Transaction
+	prevHash    []byte
+	hash        []byte
+	timestamp   uint32
 }
 
 type Blockchain struct {
@@ -29,7 +33,10 @@ func main() {
 	bitcoin := InitBlockChain()
 	transaction := createTransaction("Ayush", "Tesla", 5000.25)
 	bitcoin.addToPendingTransaction(transaction)
-	fmt.Println(proofOfWork([]byte("test"), bitcoin.blocks[0]))
+	bitcoin.mine()
+	fmt.Println(bitcoin.blocks[1])
+	fmt.Printf("%+v", bitcoin.pendingTransactions[0])
+	// fmt.Println(proofOfWork([]byte("test"), bitcoin.blocks[0]))
 }
 
 func InitBlockChain() *Blockchain {
@@ -40,15 +47,40 @@ func InitBlockChain() *Blockchain {
 func createGenesisBlock() *Block {
 	prevHash := sha256.Sum256([]byte("Golang Genesis Previous"))
 	hash := sha256.Sum256([]byte("Golang Genesis Hash"))
-	data := &Transaction{amount: 51000.85, sender: []byte("Dexter associates"), receiver: []byte("AA Markers")}
-	return &Block{prevHash: prevHash[:], data: []*Transaction{data}, hash: hash[:]}
+	return &Block{index: 0, prevHash: prevHash[:], hash: hash[:], timestamp: getTimestamp()}
+}
+
+func getTimestamp() uint32 {
+	return uint32(time.Now().Unix())
+}
+
+func (b *Blockchain) mine() {
+	noOfBlocks := len(b.blocks)
+	previousBlock := b.blocks[noOfBlocks-1]
+	previousHash := previousBlock.hash
+	currentBlock := &Block{transcation: b.pendingTransactions}
+	nonce, currentBlockHash := proofOfWork(previousHash, currentBlock)
+	b.createNewBlock(noOfBlocks, nonce, string(previousHash), currentBlockHash)
+}
+
+func (b *Blockchain) createNewBlock(index int, nonce int32, previousHash string, blockHash string) {
+	block := &Block{
+		index:       uint32(index),
+		nonce:       uint32(nonce),
+		transcation: b.pendingTransactions,
+		prevHash:    []byte(previousHash),
+		hash:        []byte(blockHash),
+		timestamp:   getTimestamp(),
+	}
+	b.pendingTransactions = []*Transaction{createTransaction("00", "Miner#id", 12.5)}
+	b.blocks = append(b.blocks, block)
 }
 
 func (b *Blockchain) addToPendingTransaction(newTransaction *Transaction) {
 	b.pendingTransactions = append(b.pendingTransactions, newTransaction)
 }
 
-func proofOfWork(previousHash []byte, currentBlock *Block) int32 {
+func proofOfWork(previousHash []byte, currentBlock *Block) (int32, string) {
 	nonce := 0
 	hash, memory := generateBlockHash(nonce, previousHash, currentBlock, []byte{})
 	for hash[:5] != "00000" {
@@ -57,7 +89,7 @@ func proofOfWork(previousHash []byte, currentBlock *Block) int32 {
 	}
 	// fmt.Println(stringHash)
 	// fmt.Println(stringHash[:5] != "00000")
-	return int32(nonce)
+	return int32(nonce), hash
 }
 
 func generateBlockHash(nonce int, previousHash []byte, currentBlock *Block, memory []byte) (string, []byte) {
@@ -67,7 +99,7 @@ func generateBlockHash(nonce int, previousHash []byte, currentBlock *Block, memo
 	if len(memory) > 0 {
 		byteBlock = memory
 	} else {
-		byteBlock = getByteTransactions(currentBlock.data)
+		byteBlock = getByteTransactions(currentBlock.transcation)
 	}
 	combinedByteData := append(append(b, previousHash...), byteBlock...)
 	// fmt.Printf("Nonce value: %v\n", nonce)
@@ -96,7 +128,7 @@ func createNewBlock() *Block {
 }
 
 func (b *Block) addTranscationToBlock(Transaction *Transaction) {
-	b.data = append(b.data, Transaction)
+	b.transcation = append(b.transcation, Transaction)
 }
 
 func createTransaction(sender string, receiver string, amount float32) *Transaction {
