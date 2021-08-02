@@ -5,7 +5,10 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/gob"
+	"encoding/json"
 	"fmt"
+	"log"
+	"net/http"
 	"time"
 )
 
@@ -33,10 +36,31 @@ func main() {
 	bitcoin := InitBlockChain()
 	transaction := createTransaction("Ayush", "Tesla", 5000.25)
 	bitcoin.addToPendingTransaction(transaction)
-	bitcoin.mine()
-	fmt.Println(bitcoin.blocks[1])
-	fmt.Printf("%+v", bitcoin.pendingTransactions[0])
+
+	http.HandleFunc("/blockchain", func(w http.ResponseWriter, r *http.Request) {
+		j, err := json.Marshal(*transaction)
+		fmt.Println(err)
+		w.Header().Add("content-type", "text/json")
+		w.Write(j)
+		fmt.Println(string(j))
+	})
+
+	log.Println("Go!")
+
+	http.ListenAndServe(":8080", nil)
+
+	// bitcoin.mine()
+	// fmt.Println(bitcoin.blocks[1])
+	// fmt.Printf("%+v", bitcoin.pendingTransactions[0])
 	// fmt.Println(proofOfWork([]byte("test"), bitcoin.blocks[0]))
+}
+
+func (t *Transaction) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&Transaction{
+		amount:   t.amount,
+		sender:   t.sender,
+		receiver: t.receiver,
+	})
 }
 
 func InitBlockChain() *Blockchain {
