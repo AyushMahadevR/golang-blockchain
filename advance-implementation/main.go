@@ -1,26 +1,50 @@
 package main
 
 import (
-	"encoding/json"
 	"go-blockchain/blockchain"
+	"go-blockchain/controller"
 	"log"
 	"net/http"
+	"os"
+
+	"github.com/google/uuid"
 )
 
-func main() {
-	http.HandleFunc("/blockchain", func(w http.ResponseWriter, r *http.Request) {
-		bitcoin := blockchain.InitBlockChain()
-		transaction := blockchain.CreateTransaction("Ayush", "Tesla", 5000.25)
+var DEFAULT_PORT = "80"
+var DEFAULT_NODE = "http://localhost"
 
-		bitcoin.AddToPendingTransaction(transaction)
-		bitcoin.Mine()
-		bitcoinJSON, _ := json.Marshal(bitcoin)
-		w.Header().Add("content-type", "text/json")
-		w.Write(bitcoinJSON)
+func main() {
+	nodeAddress := uuid.New().String()
+	port, currentNodeUrl := getPortAndNodeUrl(1, 2)
+	bitcoin := blockchain.InitBlockChain(currentNodeUrl)
+	http.HandleFunc("/blockchain", func(rw http.ResponseWriter, r *http.Request) {
+		log.Println("/blockchain called", r.Body)
+		controller.BlockChainController(rw, r, bitcoin)
+	})
+	http.HandleFunc("/transaction", func(rw http.ResponseWriter, r *http.Request) {
+		log.Println("/transaction called", r.Body)
+		controller.TranscationController(rw, r, bitcoin)
+	})
+	http.HandleFunc("/mine", func(rw http.ResponseWriter, r *http.Request) {
+		log.Println("/mine called", r.Body)
+		controller.Mine(rw, r, bitcoin, nodeAddress)
 	})
 
 	log.Println("Go!")
 
-	http.ListenAndServe(":80", nil)
+	http.ListenAndServe(":"+port, nil)
 
+}
+
+func getPortAndNodeUrl(portArgPosition int, NodeUrlArgPosition int) (string, string) {
+	port := getArgument(DEFAULT_PORT, portArgPosition)
+	currentNodeUrl := getArgument(DEFAULT_NODE, NodeUrlArgPosition) + ":" + port
+	return port, currentNodeUrl
+}
+
+func getArgument(defaultValue string, position int) string {
+	if (position != 0) && len(os.Args) > position {
+		return os.Args[position]
+	}
+	return defaultValue
 }

@@ -27,11 +27,13 @@ type Block struct {
 type Blockchain struct {
 	Blocks              []*Block       `json:"blocks"`
 	PendingTransactions []*Transaction `json:"pendingTranscations"`
+	CurrentNodeUrl      string         `json:"currentNodeUrl"`
+	NetworkNodes        []string       `json:"networkNodes"`
 }
 
-func InitBlockChain() *Blockchain {
+func InitBlockChain(currentNodeUrl string) *Blockchain {
 	genesis := CreateGenesisBlock()
-	return &Blockchain{Blocks: []*Block{genesis}}
+	return &Blockchain{Blocks: []*Block{genesis}, CurrentNodeUrl: currentNodeUrl}
 }
 
 func CreateGenesisBlock() *Block {
@@ -49,16 +51,16 @@ func GetTimestamp() uint32 {
 	return uint32(time.Now().Unix())
 }
 
-func (b *Blockchain) Mine() {
+func (b *Blockchain) Mine(nodeAddress string) {
 	noOfBlocks := len(b.Blocks)
 	previousBlock := b.Blocks[noOfBlocks-1]
 	previousHash := []byte(previousBlock.Hash)
 	currentBlock := &Block{Transcations: b.PendingTransactions}
 	nonce, currentBlockHash := ProofOfWork(previousHash, currentBlock)
-	b.CreateNewBlock(noOfBlocks, nonce, string(previousHash), currentBlockHash)
+	b.CreateNewBlock(noOfBlocks, nonce, string(previousHash), currentBlockHash, nodeAddress)
 }
 
-func (b *Blockchain) CreateNewBlock(index int, nonce int32, previousHash string, blockHash string) {
+func (b *Blockchain) CreateNewBlock(index int, nonce int32, previousHash string, blockHash string, nodeAddress string) {
 	Block := &Block{
 		Index:        uint32(index),
 		Nonce:        uint32(nonce),
@@ -67,7 +69,7 @@ func (b *Blockchain) CreateNewBlock(index int, nonce int32, previousHash string,
 		Hash:         blockHash,
 		Timestamp:    GetTimestamp(),
 	}
-	b.PendingTransactions = []*Transaction{CreateTransaction("00", "Miner#id", 12.5)}
+	b.PendingTransactions = []*Transaction{CreateTransaction("00", nodeAddress, 12.5)}
 	b.Blocks = append(b.Blocks, Block)
 }
 
