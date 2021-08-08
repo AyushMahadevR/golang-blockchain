@@ -33,7 +33,7 @@ type Blockchain struct {
 
 func InitBlockChain(currentNodeUrl string) *Blockchain {
 	genesis := CreateGenesisBlock()
-	return &Blockchain{Blocks: []*Block{genesis}, CurrentNodeUrl: currentNodeUrl}
+	return &Blockchain{Blocks: []*Block{genesis}, CurrentNodeUrl: currentNodeUrl, NetworkNodes: []string{}}
 }
 
 func CreateGenesisBlock() *Block {
