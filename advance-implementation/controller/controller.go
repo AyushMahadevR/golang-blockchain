@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"strings"
 )
 
 func BlockChainController(w http.ResponseWriter, r *http.Request, b *blockchain.Blockchain) {
@@ -36,18 +37,34 @@ func Mine(w http.ResponseWriter, r *http.Request, b *blockchain.Blockchain, node
 	w.Write(bChainJSON)
 }
 
-func RegisterNewNode(w http.ResponseWriter, r *http.Request, bitcoin *blockchain.Blockchain, currentNodeUrl string) {
+func RegisterNewNode(w http.ResponseWriter, r *http.Request, blockchain *blockchain.Blockchain) {
 	request := make(map[string]string)
 	reqBody := getBodyAsBytes(r.Body)
 	_ = json.Unmarshal(reqBody, &request)
 	newNodeUrl := request["newNodeUrl"]
-	isNotCurrentNodeUrl := newNodeUrl != currentNodeUrl
-	newNodeUrlNotPresent := !stringInSlice(newNodeUrl, bitcoin.NetworkNodes)
-	if isNotCurrentNodeUrl && newNodeUrlNotPresent {
-		bitcoin.NetworkNodes = append(bitcoin.NetworkNodes, newNodeUrl)
-	}
+	addNewNodeIfNotExists(newNodeUrl, blockchain)
 	w.Header().Add("Content-Type", "application/json")
 	w.Write([]byte("{\"message\":\"Node: " + newNodeUrl + " successfully added!\"}"))
+}
+
+func RegisterNewNodesBulk(w http.ResponseWriter, r *http.Request, blockchain *blockchain.Blockchain) {
+	request := make(map[string][]string)
+	reqBody := getBodyAsBytes(r.Body)
+	_ = json.Unmarshal(reqBody, &request)
+	allNetworkNodes := request["allNetworkNodes"]
+	for _, newNodeUrl := range allNetworkNodes {
+		addNewNodeIfNotExists(newNodeUrl, blockchain)
+	}
+	w.Header().Add("Content-Type", "application/json")
+	w.Write([]byte("{\"message\":\"Nodes: " + strings.Join(allNetworkNodes, ", ") + " successfully added!\"}"))
+}
+
+func addNewNodeIfNotExists(newNodeUrl string, blockchain *blockchain.Blockchain) {
+	isNotCurrentNodeUrl := newNodeUrl != blockchain.CurrentNodeUrl
+	newNodeUrlNotPresent := !stringInSlice(newNodeUrl, blockchain.NetworkNodes)
+	if isNotCurrentNodeUrl && newNodeUrlNotPresent {
+		blockchain.NetworkNodes = append(blockchain.NetworkNodes, newNodeUrl)
+	}
 }
 
 func getBodyAsBytes(body io.ReadCloser) []byte {

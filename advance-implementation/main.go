@@ -31,7 +31,11 @@ func main() {
 	})
 	http.HandleFunc("/register-node", func(rw http.ResponseWriter, r *http.Request) {
 		log.Println("/register-node called", r.Body)
-		controller.RegisterNewNode(rw, r, bitcoin, currentNodeUrl)
+		controller.RegisterNewNode(rw, r, bitcoin)
+	})
+	http.HandleFunc("/register-nodes-bulk", func(rw http.ResponseWriter, r *http.Request) {
+		log.Println("/register-node called", r.Body)
+		controller.RegisterNewNodesBulk(rw, r, bitcoin)
 	})
 
 	log.Println("Go!")
