@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"go-blockchain/blockchain"
@@ -8,6 +9,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
+	"sync"
 )
 
 func BlockChainController(w http.ResponseWriter, r *http.Request, b *blockchain.Blockchain) {
@@ -37,34 +39,72 @@ func Mine(w http.ResponseWriter, r *http.Request, b *blockchain.Blockchain, node
 	w.Write(bChainJSON)
 }
 
-func RegisterNewNode(w http.ResponseWriter, r *http.Request, blockchain *blockchain.Blockchain) {
+func RegisterAndBroadcastNewNode(w http.ResponseWriter, r *http.Request, b *blockchain.Blockchain) {
 	request := make(map[string]string)
 	reqBody := getBodyAsBytes(r.Body)
 	_ = json.Unmarshal(reqBody, &request)
 	newNodeUrl := request["newNodeUrl"]
-	addNewNodeIfNotExists(newNodeUrl, blockchain)
+	addNewNodeIfNotExists(newNodeUrl, b)
+	postBody, _ := json.Marshal(map[string]string{"newNodeUrl": newNodeUrl})
+	responseBody := bytes.NewBuffer(postBody)
+	waitGroup := sync.WaitGroup{}
+	for _, nodesUrl := range b.NetworkNodes {
+		waitGroup.Add(1)
+		go func(nUrl string) {
+			fmt.Println("url ", nUrl)
+			resp, _ := http.Post(nUrl+"/register-node", "application/json", responseBody)
+			defer resp.Body.Close()
+			reqBody := getBodyAsBytes(resp.Body)
+			fmt.Println(string(reqBody))
+			waitGroup.Done()
+		}(nodesUrl)
+	}
+	waitGroup.Wait()
+	_postBody, _ := json.Marshal(map[string][]string{"allNetworkNodes": append(b.NetworkNodes, b.CurrentNodeUrl)})
+	fmt.Println(string(_postBody))
+	fmt.Println("network nodes " + strings.Join(b.NetworkNodes, ", "))
+	_responseBody := bytes.NewBuffer(_postBody)
+	_resp, _ := http.Post(newNodeUrl+"/register-nodes-bulk", "application/json", _responseBody)
+	fmt.Println("broadcast report send")
+	defer _resp.Body.Close()
+	_reqBody := getBodyAsBytes(_resp.Body)
+	fmt.Println("register-nodes-bulk response: " + string(_reqBody))
+	w.Header().Add("Content-Type", "application/json")
+	w.Write([]byte("{\"message\":\"Bulk registration successfully performed!\"}"))
+}
+
+func RegisterNewNode(w http.ResponseWriter, r *http.Request, b *blockchain.Blockchain) {
+	request := make(map[string]string)
+	reqBody := getBodyAsBytes(r.Body)
+	_ = json.Unmarshal(reqBody, &request)
+	newNodeUrl := request["newNodeUrl"]
+	addNewNodeIfNotExists(newNodeUrl, b)
 	w.Header().Add("Content-Type", "application/json")
 	w.Write([]byte("{\"message\":\"Node: " + newNodeUrl + " successfully added!\"}"))
 }
 
-func RegisterNewNodesBulk(w http.ResponseWriter, r *http.Request, blockchain *blockchain.Blockchain) {
+func RegisterNewNodesBulk(w http.ResponseWriter, r *http.Request, b *blockchain.Blockchain) {
 	request := make(map[string][]string)
 	reqBody := getBodyAsBytes(r.Body)
 	_ = json.Unmarshal(reqBody, &request)
 	allNetworkNodes := request["allNetworkNodes"]
 	for _, newNodeUrl := range allNetworkNodes {
-		addNewNodeIfNotExists(newNodeUrl, blockchain)
+		addNewNodeIfNotExists(newNodeUrl, b)
 	}
 	w.Header().Add("Content-Type", "application/json")
 	w.Write([]byte("{\"message\":\"Nodes: " + strings.Join(allNetworkNodes, ", ") + " successfully added!\"}"))
 }
 
 func addNewNodeIfNotExists(newNodeUrl string, blockchain *blockchain.Blockchain) {
-	isNotCurrentNodeUrl := newNodeUrl != blockchain.CurrentNodeUrl
+	isNotCurrentNodeUrl := sanitizedString(newNodeUrl) != blockchain.CurrentNodeUrl
 	newNodeUrlNotPresent := !stringInSlice(newNodeUrl, blockchain.NetworkNodes)
 	if isNotCurrentNodeUrl && newNodeUrlNotPresent {
 		blockchain.NetworkNodes = append(blockchain.NetworkNodes, newNodeUrl)
 	}
+}
+
+func sanitizedString(word string) string {
+	return strings.ToLower(strings.TrimSpace(word))
 }
 
 func getBodyAsBytes(body io.ReadCloser) []byte {
@@ -77,7 +117,7 @@ func getBodyAsBytes(body io.ReadCloser) []byte {
 
 func stringInSlice(a string, list []string) bool {
 	for _, b := range list {
-		if b == a {
+		if sanitizedString(b) == sanitizedString(a) {
 			return true
 		}
 	}

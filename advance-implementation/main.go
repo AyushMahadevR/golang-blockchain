@@ -29,6 +29,10 @@ func main() {
 		log.Println("/mine called", r.Body)
 		controller.Mine(rw, r, bitcoin, nodeAddress)
 	})
+	http.HandleFunc("/register-and-broadcast-node", func(rw http.ResponseWriter, r *http.Request) {
+		log.Println("/register-and-broadcast-node", r.Body)
+		controller.RegisterAndBroadcastNewNode(rw, r, bitcoin)
+	})
 	http.HandleFunc("/register-node", func(rw http.ResponseWriter, r *http.Request) {
 		log.Println("/register-node called", r.Body)
 		controller.RegisterNewNode(rw, r, bitcoin)
