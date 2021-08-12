@@ -42,7 +42,7 @@ func main() {
 		controller.RegisterNewNodesBulk(rw, r, bitcoin)
 	})
 
-	log.Println("Go!")
+	log.Println("Go! server running on port: " + port)
 
 	http.ListenAndServe(":"+port, nil)
 

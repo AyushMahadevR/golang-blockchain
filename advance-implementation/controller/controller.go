@@ -42,6 +42,7 @@ func Mine(w http.ResponseWriter, r *http.Request, b *blockchain.Blockchain, node
 func RegisterAndBroadcastNewNode(w http.ResponseWriter, r *http.Request, b *blockchain.Blockchain) {
 	request := make(map[string]string)
 	reqBody := getBodyAsBytes(r.Body)
+	fmt.Print(string(reqBody))
 	_ = json.Unmarshal(reqBody, &request)
 	newNodeUrl := request["newNodeUrl"]
 	addNewNodeIfNotExists(newNodeUrl, b)
@@ -52,10 +53,12 @@ func RegisterAndBroadcastNewNode(w http.ResponseWriter, r *http.Request, b *bloc
 		waitGroup.Add(1)
 		go func(nUrl string) {
 			fmt.Println("url ", nUrl)
-			resp, _ := http.Post(nUrl+"/register-node", "application/json", responseBody)
-			defer resp.Body.Close()
-			reqBody := getBodyAsBytes(resp.Body)
-			fmt.Println(string(reqBody))
+			resp, err := http.Post(nUrl+"/register-node", "application/json", responseBody)
+			if err == nil {
+				defer resp.Body.Close()
+				reqBody := getBodyAsBytes(resp.Body)
+				fmt.Println(string(reqBody))
+			}
 			waitGroup.Done()
 		}(nodesUrl)
 	}
@@ -64,11 +67,13 @@ func RegisterAndBroadcastNewNode(w http.ResponseWriter, r *http.Request, b *bloc
 	fmt.Println(string(_postBody))
 	fmt.Println("network nodes " + strings.Join(b.NetworkNodes, ", "))
 	_responseBody := bytes.NewBuffer(_postBody)
-	_resp, _ := http.Post(newNodeUrl+"/register-nodes-bulk", "application/json", _responseBody)
+	_resp, _err := http.Post(newNodeUrl+"/register-nodes-bulk", "application/json", _responseBody)
 	fmt.Println("broadcast report send")
-	defer _resp.Body.Close()
-	_reqBody := getBodyAsBytes(_resp.Body)
-	fmt.Println("register-nodes-bulk response: " + string(_reqBody))
+	if _err == nil {
+		defer _resp.Body.Close()
+		_reqBody := getBodyAsBytes(_resp.Body)
+		fmt.Println("register-nodes-bulk response: " + string(_reqBody))
+	}
 	w.Header().Add("Content-Type", "application/json")
 	w.Write([]byte("{\"message\":\"Bulk registration successfully performed!\"}"))
 }
