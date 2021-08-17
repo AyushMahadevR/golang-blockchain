@@ -20,16 +20,41 @@ func BlockChainController(w http.ResponseWriter, r *http.Request, b *blockchain.
 
 func TranscationController(w http.ResponseWriter, r *http.Request, b *blockchain.Blockchain) {
 	transaction := &blockchain.Transaction{}
-	fmt.Printf("%+v", transaction)
+	fmt.Printf("%+v\n", transaction)
 	reqBody := getBodyAsBytes(r.Body)
 	err := json.Unmarshal(reqBody, transaction)
-	fmt.Printf("%+v", transaction)
+	fmt.Printf("%+v\n", transaction)
 	if err != nil {
 		fmt.Println(err)
 	}
 	b.AddToPendingTransaction(transaction)
 	w.Header().Add("Content-Type", "application/json")
 	w.Write([]byte("{\"message\":\"Transaction successfully added!\"}"))
+}
+
+func TranscationBroadcastController(w http.ResponseWriter, r *http.Request, b *blockchain.Blockchain) {
+	transaction := &blockchain.Transaction{}
+	reqBody := getBodyAsBytes(r.Body)
+	err := json.Unmarshal(reqBody, transaction)
+	if err != nil {
+		fmt.Println(err)
+	}
+	b.AddToPendingTransaction(transaction)
+	waitGroup := sync.WaitGroup{}
+	for _, nodeUrl := range b.NetworkNodes {
+		waitGroup.Add(1)
+		go func(requestBody []byte, nodeUrl string) {
+			resp, err := http.Post(nodeUrl+"/transaction", "application/json", bytes.NewBuffer(requestBody))
+			if err == nil {
+				defer resp.Body.Close()
+				fmt.Println(string(getBodyAsBytes(resp.Body)))
+			}
+			waitGroup.Done()
+		}(reqBody, nodeUrl)
+	}
+	waitGroup.Wait()
+	w.Header().Add("Content-Type", "application/json")
+	w.Write([]byte(`{"message": "Transcation successfully broadcasted to all nodes!."}`))
 }
 
 func Mine(w http.ResponseWriter, r *http.Request, b *blockchain.Blockchain, nodeAddress string) {
@@ -63,15 +88,10 @@ func RegisterAndBroadcastNewNode(w http.ResponseWriter, r *http.Request, b *bloc
 	}
 	waitGroup.Wait()
 	_postBody, _ := json.Marshal(map[string][]string{"allNetworkNodes": append(b.NetworkNodes, b.CurrentNodeUrl)})
-	// fmt.Println(string(_postBody))
-	// fmt.Println("network nodes " + strings.Join(b.NetworkNodes, ", "))
 	_responseBody := bytes.NewBuffer(_postBody)
 	_resp, _err := http.Post(newNodeUrl+"/register-nodes-bulk", "application/json", _responseBody)
-	// fmt.Println("broadcast report send")
 	if _err == nil {
 		defer _resp.Body.Close()
-		// _reqBody := getBodyAsBytes(_resp.Body)
-		// fmt.Println("register-nodes-bulk response: " + string(_reqBody))
 	}
 	w.Header().Add("Content-Type", "application/json")
 	w.Write([]byte("{\"message\":\"Bulk registration successfully performed!\"}"))

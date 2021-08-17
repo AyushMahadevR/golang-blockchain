@@ -25,6 +25,10 @@ func main() {
 		log.Println("/transaction called", r.Body)
 		controller.TranscationController(rw, r, bitcoin)
 	})
+	http.HandleFunc("/transaction/broadcast", func(rw http.ResponseWriter, r *http.Request) {
+		log.Println("/transaction/broadcast called", r.Body)
+		controller.TranscationBroadcastController(rw, r, bitcoin)
+	})
 	http.HandleFunc("/mine", func(rw http.ResponseWriter, r *http.Request) {
 		log.Println("/mine called", r.Body)
 		controller.Mine(rw, r, bitcoin, nodeAddress)
